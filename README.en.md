@@ -63,7 +63,7 @@ The adapter sends `model`, `messages`, and `stream: false`. It reads `choices[0]
 
 Endpoints must use HTTPS and end in `/chat/completions`. Keys use Bearer authentication. Leave the key empty for a gateway that does not require one. Native Anthropic Messages, Gemini, and Responses formats are not supported.
 
-The key stays in page memory and is cleared on reload. The endpoint and model ID are stored locally. Backups include saved analyses but exclude API settings and keys. Text and keys go directly to the configured service, so check that you trust the endpoint.
+By default, the key stays in page memory. Optional encrypted storage lets you restore it with a password after a refresh. The endpoint and model ID are stored locally. Backups include saved analyses but exclude API settings and keys. Text and keys go directly to the configured service, so check that you trust the endpoint.
 
 GitHub Pages hosts static files. Direct browser requests require the provider to allow CORS. If it does not, use an HTTPS gateway that you manage. Keep shared, long-lived provider keys on your backend when they must remain private. Do not commit them to the source code.
 
@@ -74,7 +74,7 @@ This feature analyzes supplied text. It does not fetch article links, images, or
 ## Checks
 
 ```sh
-node --test ai.test.cjs
+node --test ai.test.cjs vault.test.cjs
 ```
 
 Tests cover the request format, endpoint validation, keyless gateways, errors, truncated output, and cancellation signals. They use simulated responses and do not call paid APIs.
@@ -90,3 +90,23 @@ Tests cover the request format, endpoint validation, keyless gateways, errors, t
 ## Design references
 
 [Quartz](https://github.com/jackyzha0/quartz) informed the knowledge network structure. [Kaiforge Lite](https://github.com/DevxiaLabs/kaiforge-lite) informed the dashboard layout. The interface and graphics were implemented independently.
+
+## Accounts and API key storage
+
+Use **Sign in** in the top bar to access Google sign-in through Firebase. The browser retains the session after a refresh. Library entries remain local; signing in does not sync them.
+
+AI settings include optional encrypted storage for this browser:
+
+1. Enter the endpoint, model ID, and API key.
+2. Enter a password of 12–256 characters and select the encrypted-save button.
+3. After a refresh, enter the password and select the unlock button.
+
+AES-GCM encrypts the key and its endpoint configuration. PBKDF2-SHA-256 derives the encryption key with 600,000 iterations. Each save uses a random salt and IV. The password is never stored. If you forget it, remove the record and enter your API key again. JSON backups exclude the encrypted record. Clearing browser data removes it.
+
+Clearing the active key removes it from page memory. Deleting the stored key also removes the encrypted record. Page scripts can access the plaintext key while it is unlocked. This storage does not sync through Google or provide a server vault.
+
+This deployment reuses the public Firebase Web configuration from `i2dl-c79f8`. Template users should replace the configuration in `docs/account.js`, enable Google authentication, and authorize their own domain. The current code does not access I2DL study records in Firestore.
+
+WeChat login requires a website application on the WeChat Open Platform and a backend callback service. It is not configured. Server-side key storage is also not enabled. Firebase Cloud Functions deployment requires the Blaze plan.
+
+References: [Firebase Google authentication](https://firebase.google.com/docs/auth/web/google-signin), [Cloud Functions deployment](https://firebase.google.com/docs/functions/get-started).

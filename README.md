@@ -63,7 +63,7 @@ python3 -m http.server 4317 --bind 127.0.0.1 --directory docs
 
 地址必须使用 HTTPS，以 `/chat/completions` 结尾。密钥通过 Bearer 认证发送；无密钥的自建网关可留空。当前不支持原生 Anthropic Messages、Gemini 或 Responses 格式。
 
-API Key 仅保留在当前页面内存中，刷新后需要重新填写。地址和模型 ID 保存在本机。JSON 备份包含已保存的分析，不包含 API 配置或密钥。文字与密钥直接发送到你填写的服务地址，使用前请确认该地址可信。
+API Key 默认保留在页面内存中。启用下方的“本机加密保存”后，刷新时可用口令恢复。地址和模型 ID 保存在本机。JSON 备份包含已保存的分析，不包含 API 配置或密钥。文字与密钥直接发送到你填写的服务地址，使用前请确认该地址可信。
 
 GitHub Pages 是静态托管。浏览器直连需要服务端允许 CORS（跨域请求）。如果服务不允许，可以填写自己管理的 HTTPS 兼容网关地址。不要把长期使用的共享密钥写进源码；需要隐藏服务商密钥时，应由自己的后端保管。
 
@@ -74,7 +74,7 @@ GitHub Pages 是静态托管。浏览器直连需要服务端允许 CORS（跨�
 ## 检查
 
 ```sh
-node --test ai.test.cjs
+node --test ai.test.cjs vault.test.cjs
 ```
 
 测试覆盖请求格式、地址校验、无密钥网关、错误处理、截断输出与取消信号。测试使用模拟响应，不会调用收费 API。
@@ -90,3 +90,23 @@ node --test ai.test.cjs
 ## 设计参考
 
 [Quartz](https://github.com/jackyzha0/quartz) 提供了知识网络的组织参考。[Kaiforge Lite](https://github.com/DevxiaLabs/kaiforge-lite) 提供了仪表盘布局参考。本项目的界面和图形独立实现。
+
+## 账户与密钥保存
+
+右上角“登录”使用 Firebase Google 登录。登录状态在刷新后保留。当前收藏仍保存在本机，登录不会自动同步收藏。
+
+AI 设置提供“本机加密保存”：
+
+1. 填写 API 地址、模型 ID 和 API Key。
+2. 设置 12–256 个字符的解锁口令，点击“加密保存到本机”。
+3. 刷新后，在 AI 设置输入口令，点击“解锁已保存密钥”。
+
+密钥及其接口配置使用 AES-GCM 加密。口令经 PBKDF2-SHA-256（600,000 次）派生加密密钥。每次保存使用随机盐和随机 IV。口令不存储。忘记口令后，需要删除旧记录并重新填写 API Key。加密记录不包含在 JSON 备份中。清理浏览器数据会删除它。
+
+“清除密钥”清除当前页面内存；“删除本机密钥”还会删除加密记录。解锁期间，页面脚本可以使用明文密钥。此功能不等于服务器密钥托管，也不随 Google 账户同步。
+
+本实例复用 `i2dl-c79f8` 的公开 Firebase Web 配置。复用模板时，修改 `docs/account.js` 为自己的项目配置，在 Firebase 启用 Google 登录，并授权自己的域名。当前代码不读写 I2DL 的 Firestore 学习进度。
+
+微信扫码登录尚未配置。它需要微信开放平台网站应用和后端回调服务。云端密钥托管也尚未启用。若使用 Firebase Cloud Functions，需要 Blaze 方案。
+
+参考：[Firebase Google 登录](https://firebase.google.com/docs/auth/web/google-signin)、[Cloud Functions 部署条件](https://firebase.google.com/docs/functions/get-started)。
