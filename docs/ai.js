@@ -1,4 +1,4 @@
-/* Chat Completions adapter. No credentials are persisted. */
+/* Chat Completions adapter. Optional storage contains encrypted credentials only. */
 (function(root){
 'use strict';
 function endpoint(value){
@@ -35,13 +35,21 @@ const q=s=>document.querySelector(s), settingsKey='neuron-ai-settings-v1';
 let settings={endpoint:'',model:'',key:''},active=null,draft=null,controller=null,timedOut=false;
 try{const saved=JSON.parse(localStorage.getItem(settingsKey));if(saved){settings.endpoint=endpoint(saved.endpoint);settings.model=String(saved.model||'').slice(0,160)}}catch{}
 function status(text){q('#aiStatus').textContent=text}
-function showSettings(){q('#apiEndpoint').value=settings.endpoint;q('#apiModel').value=settings.model;q('#apiKey').value=settings.key;q('#apiStatus').textContent='';q('#apiDialog').showModal()}
+function showSettings(){q('#apiEndpoint').value=settings.endpoint;q('#apiModel').value=settings.model;q('#apiKey').value=settings.key;q('#apiStatus').textContent='';q('#vaultPassword')&&(q('#vaultPassword').value='');vaultState();q('#apiDialog').showModal()}
 function readSettings(){return {endpoint:endpoint(q('#apiEndpoint').value),model:q('#apiModel').value.trim(),key:q('#apiKey').value.trim()}}
 q('#aiSettingsBtn').onclick=showSettings;
+root.addEventListener?.('neuron-signout',()=>{settings.key='';q('#apiKey').value='';controller?.abort()});
 q('#closeApi').onclick=()=>q('#apiDialog').close();
 q('#clearApiKey').onclick=()=>{settings.key='';q('#apiKey').value='';q('#apiStatus').textContent='密钥已清除。'};
 q('#apiForm').onsubmit=e=>{e.preventDefault();try{const next=readSettings();if(!next.model)throw Error('请填写模型 ID。');settings=next;try{localStorage.setItem(settingsKey,JSON.stringify({endpoint:settings.endpoint,model:settings.model}))}catch{}q('#apiDialog').close();toast('API 配置已应用，密钥仅保留到页面刷新前。')}catch(error){q('#apiStatus').textContent=error.message}};
-q('#apiDialog').addEventListener('close',()=>{q('#apiKey').value=''});
+q('#apiDialog').addEventListener('close',()=>{q('#apiKey').value='';if(q('#vaultPassword'))q('#vaultPassword').value=''});
+function vaultState(){if(!q('#vaultStatus'))return;try{q('#vaultStatus').textContent=localStorage.getItem(root.NeuronVault.storageKey)?'本机有已加密的密钥。刷新后可用口令解锁。':'尚未在本机保存密钥。'}catch{q('#vaultStatus').textContent='浏览器禁止本机存储。'}}
+async function vaultAction(action){const buttons=['#saveVault','#unlockVault','#deleteVault'];buttons.forEach(id=>q(id).disabled=true);try{await action()}catch(error){q('#apiStatus').textContent=error.message}finally{q('#vaultPassword').value='';buttons.forEach(id=>q(id).disabled=false);vaultState()}}
+if(root.NeuronVault){
+ q('#saveVault').onclick=()=>vaultAction(async()=>{const config=readSettings();if(!config.key||!config.model)throw Error('请先填写 API Key 和模型 ID。');const encrypted=await root.NeuronVault.seal(config,q('#vaultPassword').value);localStorage.setItem(root.NeuronVault.storageKey,JSON.stringify(encrypted));settings=config;q('#apiStatus').textContent='已加密保存并应用。刷新后输入口令解锁即可。'});
+ q('#unlockVault').onclick=()=>vaultAction(async()=>{const raw=localStorage.getItem(root.NeuronVault.storageKey);if(!raw)throw Error('本机尚未保存密钥。');const config=await root.NeuronVault.open(JSON.parse(raw),q('#vaultPassword').value);config.endpoint=endpoint(config.endpoint);settings=config;q('#apiEndpoint').value=config.endpoint;q('#apiModel').value=config.model;q('#apiKey').value=config.key;q('#apiStatus').textContent='密钥已解锁并应用。关闭此窗口即可分析。'});
+ q('#deleteVault').onclick=()=>vaultAction(async()=>{localStorage.removeItem(root.NeuronVault.storageKey);settings.key='';q('#apiKey').value='';q('#apiStatus').textContent='已删除本机加密记录，并清除内存中的密钥。'});
+}
 q('#testApi').onclick=async()=>{const button=q('#testApi');button.disabled=true;const abort=new AbortController();const timer=setTimeout(()=>abort.abort(),30000);try{const config=readSettings();q('#apiStatus').textContent=`正在测试 ${new URL(config.endpoint).hostname}，此请求可能计费。`;await request(config,[{role:'user',content:'Reply with OK.'}],{signal:abort.signal});q('#apiStatus').textContent='连接成功，接口返回了文本。'}catch(error){q('#apiStatus').textContent=abort.signal.aborted?'测试超时（30 秒）。':error.message}finally{clearTimeout(timer);button.disabled=false}};
 root.openAIAnalysis=function(entry){active=entry.id;draft=null;q('#aiText').value=entry.summary==='已保存链接，等待整理。'?'':entry.summary;q('#aiResult').textContent='';q('#saveAnalysis').disabled=true;q('#aiTitle').textContent=entry.title;q('#aiDestination').textContent=settings.endpoint?`发送到 ${settings.endpoint} · 模型 ${settings.model}`:'尚未配置 API。请先打开 AI 设置。';status('只发送下方文字。链接、图片和评论不会被自动读取。');q('#analysisDialog').showModal()};
 q('#analysisSettings').onclick=showSettings;
