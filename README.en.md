@@ -50,17 +50,41 @@ Use “导出 JSON” at the bottom of the page to download a backup. Use “导
 
 This repository contains no personal Notion links, account credentials, or saved entries. Source icons identify platforms and do not imply an affiliation.
 
-## Reading links and syncing data
+## Connect an AI API
 
-This version stores links and notes entered by the user. “复制整理指令” copies a prompt for an assistant. The app has no backend for fetching articles or calling a model.
+1. Open “AI 设置” in the sidebar.
+2. Enter the full endpoint, such as `https://your-provider.example/v1/chat/completions`.
+3. Enter the model ID and API key from your provider.
+4. Optionally select “测试连接”, then select “应用配置”. The connection test sends a short message and may incur charges.
+5. Open an entry and select “AI 分析”. Paste the source text or notes, choose an analysis mode, and select “发送文字并分析”.
+6. Review the output and select “保存分析”. The result is saved separately from your original notes.
 
-Notion is not required. Reading links, generating summaries, and syncing data within the site would require a backend, a database, and authentication. Model API keys belong on the server. GitHub Pages hosts static files and cannot run those server tasks itself.
+The adapter sends `model`, `messages`, and `stream: false`. It reads `choices[0].message.content`. Providers and gateways that implement the Chat Completions format can use this adapter. [DeepSeek's API documentation](https://api-docs.deepseek.com/api/create-chat-completion/) provides an example of this format. Use the endpoint and model ID specified by your provider.
+
+Endpoints must use HTTPS and end in `/chat/completions`. Keys use Bearer authentication. Leave the key empty for a gateway that does not require one. Native Anthropic Messages, Gemini, and Responses formats are not supported.
+
+The key stays in page memory and is cleared on reload. The endpoint and model ID are stored locally. Backups include saved analyses but exclude API settings and keys. Text and keys go directly to the configured service, so check that you trust the endpoint.
+
+GitHub Pages hosts static files. Direct browser requests require the provider to allow CORS. If it does not, use an HTTPS gateway that you manage. Keep shared, long-lived provider keys on your backend when they must remain private. Do not commit them to the source code.
+
+Each request accepts up to 30,000 characters and times out after 90 seconds. You can cancel a request, although the provider may still charge for work already performed. Output is displayed as plain text. The app reports truncated responses.
+
+This feature analyzes supplied text. It does not fetch article links, images, or comments. Notion is not required. Automatic collection and cross-device sync still need a backend and database.
+
+## Checks
+
+```sh
+node --test ai.test.cjs
+```
+
+Tests cover the request format, endpoint validation, keyless gateways, errors, truncated output, and cancellation signals. They use simulated responses and do not call paid APIs.
 
 ## Files
 
 - `docs/index.html`: page structure and forms.
 - `docs/style.css`: layout, colors, and responsive styles.
 - `docs/app.js`: entries, search, categories, graph, and backups.
+- `docs/ai.js`: API requests, configuration, and saved analyses.
 - `docs/.nojekyll`: direct static publication on GitHub Pages.
 
 ## Design references
